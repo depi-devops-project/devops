@@ -3,6 +3,8 @@
 *.tfstate
 *.tfstate.*
 
+*.pem
+
 *.tfvars
 *.tfvars.json
 .terraformrc
