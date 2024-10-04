@@ -1,18 +1,20 @@
+# jenkins-docker-playbook.yml
 ---
 - name: Install Jenkins and Docker
-  hosts: jenkins_host
-  become: true
-  
+  hosts: jenkins
+  become: yes
   tasks:
-    # Install Java (required for Jenkins)
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
     - name: Install Java 11
       apt:
         name: openjdk-11-jdk
         state: present
-        update_cache: yes
 
-    # Install Docker dependencies
-    - name: Install Docker dependencies
+    - name: Install required packages
       apt:
         name:
           - apt-transport-https
@@ -22,67 +24,56 @@
           - gnupg
         state: present
 
-    # Add Docker GPG key
     - name: Add Docker GPG key
       apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    # Add Docker repository
     - name: Add Docker repository
       apt_repository:
-        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable
+        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
         state: present
 
-    # Install Docker
     - name: Install Docker
       apt:
         name: docker-ce
         state: present
-        update_cache: yes
 
-    # Start and enable Docker service
     - name: Start Docker service
       service:
         name: docker
         state: started
         enabled: yes
 
-    # Add user to docker group
-    - name: Add user to docker group
+    - name: Add ubuntu user to docker group
       user:
-        name: "{{ ansible_user }}"
+        name: ubuntu
         groups: docker
         append: yes
 
-    # Install Jenkins repository key
-    - name: Add Jenkins apt key
+    - name: Add Jenkins repository key
       apt_key:
         url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
         state: present
 
-    # Add Jenkins repository
     - name: Add Jenkins repository
       apt_repository:
         repo: deb https://pkg.jenkins.io/debian-stable binary/
         state: present
 
-    # Install Jenkins
     - name: Install Jenkins
       apt:
         name: jenkins
         state: present
         update_cache: yes
 
-    # Start and enable Jenkins service
     - name: Start Jenkins service
       service:
         name: jenkins
         state: started
         enabled: yes
 
-    # Get initial admin password
-    - name: Get Jenkins initial admin password
+    - name: Get initial Jenkins admin password
       command: cat /var/lib/jenkins/secrets/initialAdminPassword
       register: jenkins_password
       changed_when: false
