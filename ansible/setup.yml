@@ -1,83 +1,85 @@
-# jenkins-docker-playbook.yml
----
-- name: Install Jenkins and Docker
-  hosts: jenkins
-  become: yes
+- name: Install and set up Docker
+  hosts: jenkins-server
+  become: true
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   tasks:
-    - name: Update apt cache
-      apt:
-        update_cache: yes
-        cache_valid_time: 3600
-
-    - name: Install Java 11
-      apt:
-        name: openjdk-11-jdk
-        state: present
-
-    - name: Install required packages
-      apt:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - software-properties-common
-          - gnupg
-        state: present
-
-    - name: Add Docker GPG key
-      apt_key:
+    - name: Add Docker GPG apt Key
+      ansible.builtin.apt_key:
         url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-    - name: Add Docker repository
-      apt_repository:
-        repo: "deb [arch=amd64] https://download.docker.com/linux/ubuntu {{ ansible_distribution_release }} stable"
+    - name: Add Docker Repository
+      ansible.builtin.apt_repository:
+        repo: deb https://download.docker.com/linux/ubuntu focal stable
         state: present
 
-    - name: Install Docker
-      apt:
-        name: docker-ce
-        state: present
-
-    - name: Start Docker service
-      service:
-        name: docker
-        state: started
-        enabled: yes
-
-    - name: Add ubuntu user to docker group
-      user:
-        name: ubuntu
-        groups: docker
-        append: yes
-
-    - name: Add Jenkins repository key
-      apt_key:
-        url: https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-        state: present
-
-    - name: Add Jenkins repository
-      apt_repository:
-        repo: deb https://pkg.jenkins.io/debian-stable binary/
-        state: present
-
-    - name: Install Jenkins
-      apt:
+    - name: Install Docker packages
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: latest
+        update_cache: true
+    - name: Create Jenkins network
+      community.docker.docker_network:
         name: jenkins
-        state: present
-        update_cache: yes
 
-    - name: Start Jenkins service
-      service:
-        name: jenkins
+
+
+
+- name: Run Jenkins and Docker-in-Docker containers
+  hosts: jenkins-server
+  become: true
+  tasks:
+    - name: Run Docker-in-Docker
+      community.docker.docker_container:
+        name: jenkins-docker
+        image: docker:dind
         state: started
-        enabled: yes
+        restart_policy: on-failure
+        detach: true
+        privileged: true
+        networks:
+          - name: jenkins
+            aliases:
+              - docker
+        env:
+          DOCKER_TLS_CERTDIR: "/certs"
+        volumes:
+          - jenkins-docker-certs:/certs/client
+          - jenkins-data:/var/jenkins_home
+        published_ports:
+          - "2376:2376"
+        command: "--storage-driver overlay2"
 
-    - name: Get initial Jenkins admin password
-      command: cat /var/lib/jenkins/secrets/initialAdminPassword
-      register: jenkins_password
-      changed_when: false
+    - name: Run Jenkins Blue Ocean container
+      community.docker.docker_container:
+        name: jenkins-blueocean
+        image: youssefabouhemid/depi-jenkins-aws:v1.0
+        state: started
+        restart_policy: on-failure
+        detach: true
+        networks:
+          - name: jenkins
+        env:
+          DOCKER_HOST: "tcp://docker:2376"
+          DOCKER_CERT_PATH: "/certs/client"
+          DOCKER_TLS_VERIFY: "1"
+        volumes:
+          - jenkins-data:/var/jenkins_home
+          - jenkins-docker-certs:/certs/client:ro
+        published_ports:
+          - "8080:8080"
+          - "50000:50000"
 
-    - name: Display Jenkins initial admin password
-      debug:
-        var: jenkins_password.stdout
+    - name: Get Jenkins Password
+      ansible.builtin.shell: "docker exec jenkins-blueocean cat /var/jenkins_home/secrets/initialAdminPassword"
+      register: jenkins_password_output
+
+    - name: Display Jenkins Password
+      ansible.builtin.debug:
+        var: jenkins_password_output.stdout
