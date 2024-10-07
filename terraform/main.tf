@@ -134,7 +134,6 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-# IAM Role Policy for ECR access
 resource "aws_iam_role_policy" "ecr_policy" {
   name = "ecr_policy"
   role = aws_iam_role.ec2_role.id
