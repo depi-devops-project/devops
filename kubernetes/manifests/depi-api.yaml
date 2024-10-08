@@ -2,26 +2,26 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: python-app
+  name: api-service
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: python-app
-  namespace: python-app
+  name: api-service
+  namespace: api-service
 spec:
   replicas: 2
   selector:
     matchLabels:
-      app: python-app
+      app: api-service
   template:
     metadata:
       labels:
-        app: python-app
+        app: api-service
     spec:
       containers:
-      - name: python-app
-        image: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/python-app:latest
+      - name: api-service
+        image: 703862985210.dkr.ecr.us-east-1.amazonaws.com/depi-api:latest
         resources:
           requests:
             memory: "64Mi"
@@ -33,13 +33,13 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: python-app
-  namespace: python-app
+  name: api-service
+  namespace: api-service
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: python-app
+    name: api-service
   minReplicas: 2
   maxReplicas: 10
   metrics:
@@ -53,12 +53,12 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: python-app
-  namespace: python-app
+  name: api-service
+  namespace: api-service
 spec:
   selector:
-    app: python-app
+    app: api-service
   ports:
     - protocol: TCP
       port: 80
-      targetPort: 8080
+      targetPort: 3000
