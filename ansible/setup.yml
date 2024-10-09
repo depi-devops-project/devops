@@ -76,10 +76,3 @@
           - "8080:8080"
           - "50000:50000"
 
-    - name: Get Jenkins Password
-      ansible.builtin.shell: "docker exec jenkins-blueocean cat /var/jenkins_home/secrets/initialAdminPassword"
-      register: jenkins_password_output
-
-    - name: Display Jenkins Password
-      ansible.builtin.debug:
-        var: jenkins_password_output.stdout
